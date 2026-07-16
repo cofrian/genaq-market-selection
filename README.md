@@ -72,6 +72,17 @@ PUNTUACION_FINAL =
   + 0.1000 × machine yield               (litres/day in that climate)
 ```
 
+```mermaid
+pie showData
+    title Weight of each driver
+    "Regional water context" : 22.50
+    "no_potabilidad (tap water)" : 21.25
+    "Household income" : 17.00
+    "Demographic fit" : 16.00
+    "Drought pressure" : 13.25
+    "Machine yield" : 10.00
+```
+
 Weights live in [`src/config.py`](src/config.py) and are asserted to sum to 1.0.
 They were set by the team, not fitted — with no ground truth to fit against,
 pretending otherwise would be false precision. The ordering encodes the bet:
@@ -103,29 +114,67 @@ so it enters flat.
 
 ## How it works
 
-```
-        AEMET SPI            MITECO reservoirs         SINAC analyses
-     (85 stations,          (weekly, 1988–2025)       (57 parameters)
-      1–24m windows)                 │                        │
-            │                        │                        │
-            └──────► src/sequia.py ◄─┘                src/calidad_agua.py
-                     drought score                    no_potabilidad 0–100
-                          │                                   │
-                          └───────────► municipality ◄────────┘
-                                             │
-                            INE income + demographics
-                                             │
-                                    src/modelo.py
-                                  weighted sum → rank
-                                             │
-                                   results/top_50.csv
+```mermaid
+flowchart TB
+    classDef source fill:#eef2ff,stroke:#6366f1,stroke-width:1px,color:#1e1b4b
+    classDef module fill:#cffafe,stroke:#0891b2,stroke-width:1px,color:#083344
+    classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#052e16
+
+    subgraph SRC ["Public sources"]
+        direction LR
+        AEMET["AEMET · SPI<br/>85 stations · 1–24 month windows"]
+        MITECO["MITECO · reservoirs<br/>weekly levels · 1988–2025"]
+        SINAC["SINAC · water register<br/>57 parameters per sample"]
+        INE["INE · income + demographics<br/>per census section"]
+    end
+
+    SEQUIA["src/sequia.py<br/>drought pressure"]
+    CALIDAD["src/calidad_agua.py<br/>no_potabilidad 0–100"]
+    MODELO["src/modelo.py<br/>join grains → weighted sum → rank"]
+    TOP["results/top_50_secciones.csv"]
+
+    AEMET --> SEQUIA
+    MITECO --> SEQUIA
+    SINAC --> CALIDAD
+    SEQUIA -- municipality --> MODELO
+    CALIDAD -- municipality --> MODELO
+    INE -- census section --> MODELO
+    MODELO --> TOP
+
+    class AEMET,MITECO,SINAC,INE source
+    class SEQUIA,CALIDAD,MODELO module
+    class TOP output
 ```
 
-The tricky part is that the data lives at four different grains — region,
-province, municipality, census section — and only the section grain is what the
-CEO asked about. Everything is joined **downward** onto sections: municipal
-indicators via `(CPRO, CMUN)`, regional ones via `CODAUTO`. Municipal keys join
-at 100% coverage; drought reaches 92.7% of sections.
+### Four grains, one answer
+
+The data lives at four different levels of geography, and only the finest one is
+what the CEO asked about. Everything is joined **downward** onto census sections:
+
+```mermaid
+flowchart LR
+    classDef coarse fill:#fef3c7,stroke:#d97706,stroke-width:1px,color:#451a03
+    classDef mid fill:#e0e7ff,stroke:#4f46e5,stroke-width:1px,color:#1e1b4b
+    classDef fine fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#052e16
+
+    CCAA["Region · 19<br/>bottled-water use<br/>water stress"]
+    MUN["Municipality · 8,124<br/>no_potabilidad<br/>drought · machine yield"]
+    SEC["Census section · 35,891<br/>household income<br/>demographic fit"]
+    SCORE["puntuacion_final<br/>one score per section"]
+
+    CCAA -- "CODAUTO · joins 100%" --> SEC
+    MUN -- "CPRO + CMUN · joins 100%" --> SEC
+    SEC --> SCORE
+
+    class CCAA coarse
+    class MUN mid
+    class SEC,SCORE fine
+```
+
+Municipal keys join at 100% coverage; drought reaches 92.7% of sections. Note
+what this fan-out implies: a regional indicator is copied onto ~1,900 sections
+apiece, so it varies 19 ways across the whole country while income varies 35,891
+ways. [Limitations](#limitations) picks up what that does to the ranking.
 
 Linking municipalities to reservoirs needed care. Straight-line distance happily
 connects Ibiza to a mainland reservoir across open sea, so islands and the North
@@ -133,6 +182,35 @@ African enclaves are matched only within their own bounding box. The radius
 starts at 50 km and widens to 75, 100 and 160 km, but **only for municipalities
 the previous pass left unmatched** — a town next to a reservoir shouldn't have
 its score diluted by one 160 km away.
+
+```mermaid
+flowchart LR
+    classDef step fill:#e0f2fe,stroke:#0284c7,stroke-width:1px,color:#082f49
+    classDef done fill:#dcfce7,stroke:#16a34a,stroke-width:1px,color:#052e16
+    classDef none fill:#fee2e2,stroke:#dc2626,stroke-width:1px,color:#450a0a
+
+    M["Municipality"]
+    R50["within 50 km?"]
+    R75["within 75 km?"]
+    R100["within 100 km?"]
+    R160["within 160 km?"]
+    OK["reservoirs found<br/>weight by 1/distance"]
+    NO["no reservoir<br/>fall back to SPI only"]
+
+    M --> R50
+    R50 -- yes --> OK
+    R50 -- no --> R75
+    R75 -- yes --> OK
+    R75 -- no --> R100
+    R100 -- yes --> OK
+    R100 -- no --> R160
+    R160 -- yes --> OK
+    R160 -- no --> NO
+
+    class M,R50,R75,R100,R160 step
+    class OK done
+    class NO none
+```
 
 ## Quickstart
 
