@@ -60,6 +60,17 @@ class TestEvaluarMuestras:
         assert out["pH"].iloc[0] == 8.1
         assert out["dureza"].iloc[0] == 320
 
+    def test_acepta_analisis_serializado(self):
+        """An intermediate CSV round-trips the dict as text; it must still work."""
+        out = evaluar_muestras(self._df("{'PH': 8.1, 'Plomo': 5}"))
+        assert out["pH"].iloc[0] == 8.1
+        assert out["valores_true"].iloc[0] == 2
+
+    def test_analisis_vacio_no_rompe(self):
+        out = evaluar_muestras(self._df({}))
+        assert out["valores_true"].iloc[0] == 0
+        assert not out["potable"].iloc[0]
+
 
 class TestNoPotabilidad:
     def _fila(self, **kw):

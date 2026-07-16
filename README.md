@@ -6,7 +6,7 @@ a domestic atmospheric water generator — built for
 Fundación Innovación Bankinter's *Akademia* programme.
 
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-54%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-56%20passing-brightgreen.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ---
@@ -142,7 +142,7 @@ cd genaq-market-selection
 pip install -r requirements.txt
 
 python -m src.modelo          # writes results/, prints the top 10
-pytest -q                     # 54 tests
+pytest -q                     # 56 tests
 ```
 
 The processed data is committed (~5 MB), so the model runs on a fresh clone with
@@ -156,7 +156,7 @@ src/
   calidad_agua.py   SINAC analyses  → no_potabilidad
   sequia.py         reservoirs + SPI → drought score
   geocoding.py      Google Maps lookups, cached
-tests/              54 tests
+tests/              56 tests
 data/processed/     committed inputs (~5 MB)
 results/            the ranking
 notebooks/          exploration

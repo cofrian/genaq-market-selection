@@ -128,10 +128,16 @@ def agrupar_por_muestra(df: pd.DataFrame) -> pd.DataFrame:
     return agrupado.drop(columns=["parametros", "valores"])
 
 
+def _como_dict(analisis: dict | str) -> dict:
+    """Accept either a dict or its repr -- intermediate CSVs round-trip as text."""
+    if isinstance(analisis, str):
+        return ast.literal_eval(analisis)
+    return analisis or {}
+
+
 def evaluar_muestra(analisis: dict | str) -> dict[str, bool]:
     """Check each measured parameter against its limit. True == within spec."""
-    if isinstance(analisis, str):
-        analisis = ast.literal_eval(analisis)
+    analisis = _como_dict(analisis)
 
     resultado = {}
     for parametro, valor in analisis.items():
@@ -151,10 +157,11 @@ def evaluar_muestra(analisis: dict | str) -> dict[str, bool]:
 def evaluar_muestras(df: pd.DataFrame) -> pd.DataFrame:
     """Per sample: which parameters passed, how many, and whether all did."""
     df = df.copy()
-    veredictos = df["Analisis_Valor"].apply(evaluar_muestra)
+    analisis = df["Analisis_Valor"].apply(_como_dict)
+    veredictos = analisis.apply(evaluar_muestra)
 
-    df["pH"] = df["Analisis_Valor"].apply(lambda d: pd.to_numeric(d.get("PH"), errors="coerce"))
-    df["dureza"] = df["Analisis_Valor"].apply(
+    df["pH"] = analisis.apply(lambda d: pd.to_numeric(d.get("PH"), errors="coerce"))
+    df["dureza"] = analisis.apply(
         lambda d: pd.to_numeric(d.get("Dureza Total (CaCO3)"), errors="coerce")
     )
     df["valores_true"] = veredictos.apply(lambda d: sum(d.values()))
