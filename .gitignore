@@ -1,0 +1,30 @@
+# Raw source data: too large for git, and redistributing it is not ours to do.
+# data/README.md explains where each file comes from.
+data/raw/*
+!data/raw/.gitkeep
+
+# Secrets. The Google Maps key belongs in the environment, never in a file.
+.env
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Notebook output that bloats diffs
+*-checkpoint.ipynb
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Generated maps (rebuildable, several MB)
+*.html
+!docs/**/*.html
